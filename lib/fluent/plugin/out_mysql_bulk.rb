@@ -51,6 +51,11 @@ DESC
     config_param :on_duplicate_update_custom_values, :string, default: nil,
                  desc: "On_duplicate_update_custom_values, comma separator. specify the column name is insert value, custom value is use ${sql conditions}"
 
+    config_param :use_ignore, :bool, default: false,
+                 desc: "Use `INSERT IGNORE` instead of plain `INSERT`."
+    config_param :ignore_only_retry, :bool, default: false,
+                 desc: "Use `INSERT IGNORE` only after insert process fails once."
+
     attr_accessor :handler
 
     def initialize
@@ -166,7 +171,8 @@ DESC
         data = format_proc.call(tag, time, data, max_lengths)
         values << Mysql2::Client.pseudo_bind(values_template, data)
       end
-      sql = "INSERT INTO #{table} (#{@column_names.map{|x| "`#{x.to_s.gsub('`', '``')}`"}.join(',')}) VALUES #{values.join(',')}"
+      ignore = @use_ignore && (!@ignore_only_retry || @ignore_only_retry && @retry)
+      sql = "INSERT#{ignore ? " IGNORE " : " " }INTO #{table} (#{@column_names.map{|x| "`#{x.to_s.gsub('`', '``')}`"}.join(',')}) VALUES #{values.join(',')}"
       sql += @on_duplicate_key_update_sql if @on_duplicate_key_update
 
       log.info "bulk insert values size (table: #{table}) => #{values.size}"
