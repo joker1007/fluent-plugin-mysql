@@ -56,6 +56,9 @@ DESC
     config_param :ignore_only_retry, :bool, default: false,
                  desc: "Use `INSERT IGNORE` only after insert process fails once."
 
+    config_param :transaction_isolation_level, :enum, list: [:read_uncommitted, :read_committed, :repeatable_read, :serializable], default: :repeatable_read,
+                 desc: "Set transaction isolation level."
+
     attr_accessor :handler
 
     def initialize
@@ -176,6 +179,7 @@ DESC
       sql += @on_duplicate_key_update_sql if @on_duplicate_key_update
 
       log.info "bulk insert values size (table: #{table}) => #{values.size}"
+      @handler.query("SET SESSION TRANSACTION ISOLATION LEVEL #{transaction_isolation_level}")
       @handler.xquery(sql)
       @handler.close
     end
@@ -206,6 +210,19 @@ DESC
           values << value
         end
         values
+      end
+    end
+
+    def transaction_isolation_level
+      case @transaction_isolation_level
+      when :read_uncommitted
+        "READ UNCOMMITTED"
+      when :read_committed
+        "READ COMMITTED"
+      when :repeatable_read
+        "REPEATABLE READ"
+      when :serializable
+        "SERIALIZABLE"
       end
     end
   end
